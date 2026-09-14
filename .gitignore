@@ -1,0 +1,18 @@
+# your instance — never commit these
+.env
+.env.*
+gate.config.json
+server.toml
+server.state.json
+logs/
+launchd/*.plist
+!launchd/*.example.plist
+*.tmp
+__pycache__/
+.DS_Store
+app/node_modules/
+app/.next/
+app/.vercel/
+app/.env*
+!app/.env.example
+app/*.tsbuildinfo

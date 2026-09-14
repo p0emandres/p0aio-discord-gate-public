@@ -1,0 +1,177 @@
+# server.example.toml — copy to server.toml and edit. provision.py applies it to your Discord server.
+# Idempotent: re-run any time. Creates what is missing, updates what differs, never deletes.
+# Names usable in overwrites: "@everyone", "bot" (your bot's managed role), or any role listed below.
+
+[guild]
+verification_level = 3            # 0 none · 1 verified email · 2 account >5 min · 3 member >10 min · 4 verified phone
+explicit_content_filter = 2
+default_message_notifications = 1 # mentions only
+# "Require 2FA for moderator actions" cannot be set by a bot — the OWNER flips it in Server Settings → Safety Setup.
+
+[bot]
+name = "your-bot"                 # the bot's managed role name (= your application's bot username)
+# What the bot keeps AFTER the build (provision.py --drop-privileges). Everything else is removed.
+runtime_permissions = ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "READ_MESSAGE_HISTORY", "MANAGE_ROLES", "KICK_MEMBERS", "PIN_MESSAGES"]
+
+[everyone]
+permissions = []                  # unverified members get nothing; channel overwrites open exactly what they may see
+
+# ---------------------------------------------------------------- roles
+# `tier` = minimum NFTs held to earn the role. The verifier grants/revokes ONLY roles with a tier.
+[[roles]]
+name = "Team"
+color = "E0B24A"
+hoist = true
+permissions = ["VIEW_CHANNEL", "SEND_MESSAGES", "READ_MESSAGE_HISTORY", "EMBED_LINKS", "ATTACH_FILES", "ADD_REACTIONS",
+  "USE_EXTERNAL_EMOJIS", "MANAGE_MESSAGES", "MANAGE_THREADS", "KICK_MEMBERS", "MODERATE_MEMBERS", "MANAGE_NICKNAMES",
+  "VIEW_AUDIT_LOG", "MENTION_EVERYONE", "CONNECT", "SPEAK", "MUTE_MEMBERS", "MOVE_MEMBERS", "USE_APPLICATION_COMMANDS",
+  "CREATE_PUBLIC_THREADS", "SEND_MESSAGES_IN_THREADS", "CHANGE_NICKNAME"]
+
+[[roles]]
+name = "Holder"
+tier = 1
+color = "5BE0C8"
+hoist = true
+permissions = ["VIEW_CHANNEL", "SEND_MESSAGES", "READ_MESSAGE_HISTORY", "EMBED_LINKS", "ATTACH_FILES", "ADD_REACTIONS",
+  "USE_EXTERNAL_EMOJIS", "CONNECT", "SPEAK", "USE_VAD", "USE_APPLICATION_COMMANDS", "CREATE_PUBLIC_THREADS",
+  "SEND_MESSAGES_IN_THREADS", "CHANGE_NICKNAME"]
+
+[[roles]]
+name = "Whale"
+tier = 5
+color = "B48CFF"
+hoist = true
+permissions = ["VIEW_CHANNEL", "SEND_MESSAGES", "READ_MESSAGE_HISTORY", "EMBED_LINKS", "ATTACH_FILES", "ADD_REACTIONS",
+  "USE_EXTERNAL_EMOJIS", "CONNECT", "SPEAK", "USE_VAD", "USE_APPLICATION_COMMANDS", "CREATE_PUBLIC_THREADS",
+  "SEND_MESSAGES_IN_THREADS", "CHANGE_NICKNAME"]
+
+# ---------------------------------------------------------------- categories + channels
+# `match` adopts an EXISTING category/channel by its current name and renames it. A channel without `overwrites` inherits its category's.
+[[categories]]
+name = "start-here"
+[categories.overwrites]
+"@everyone" = { allow = ["VIEW_CHANNEL", "READ_MESSAGE_HISTORY"], deny = ["SEND_MESSAGES", "ADD_REACTIONS", "CREATE_PUBLIC_THREADS", "CREATE_PRIVATE_THREADS", "SEND_MESSAGES_IN_THREADS", "USE_EXTERNAL_APPS", "SEND_POLLS", "SEND_VOICE_MESSAGES"] }
+"Team" = { allow = ["SEND_MESSAGES", "MANAGE_MESSAGES"] }
+"bot" = { allow = ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "MANAGE_MESSAGES", "READ_MESSAGE_HISTORY", "PIN_MESSAGES"] }
+
+[[channels]]
+name = "rules"
+category = "start-here"
+topic = "Read these, then head to #verify."
+
+[[channels]]
+name = "verify"
+role = "verify"          # where /verify confirmations are posted
+category = "start-here"
+topic = "Type /verify here. The bot never DMs links. The only real link is the one pinned above."
+slowmode = 30
+[channels.overwrites]
+"@everyone" = { allow = ["VIEW_CHANNEL", "READ_MESSAGE_HISTORY", "USE_APPLICATION_COMMANDS"], deny = ["SEND_MESSAGES", "ADD_REACTIONS", "CREATE_PUBLIC_THREADS", "CREATE_PRIVATE_THREADS", "SEND_MESSAGES_IN_THREADS", "USE_EXTERNAL_APPS", "SEND_POLLS", "SEND_VOICE_MESSAGES"] }
+"Team" = { allow = ["SEND_MESSAGES", "MANAGE_MESSAGES"] }
+"bot" = { allow = ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "MANAGE_MESSAGES", "READ_MESSAGE_HISTORY", "PIN_MESSAGES"] }
+
+[[categories]]
+name = "holders"
+[categories.overwrites]
+"@everyone" = { deny = ["VIEW_CHANNEL"] }
+"Holder" = { allow = ["VIEW_CHANNEL"] }
+"Whale" = { allow = ["VIEW_CHANNEL"] }
+"Team" = { allow = ["VIEW_CHANNEL", "MANAGE_MESSAGES", "MENTION_EVERYONE"] }
+"bot" = { allow = ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "READ_MESSAGE_HISTORY"] }
+
+[[channels]]
+name = "announcements"
+category = "holders"
+topic = "Official announcements. Only the Team posts here."
+[channels.overwrites]
+"@everyone" = { deny = ["VIEW_CHANNEL", "SEND_MESSAGES", "CREATE_PUBLIC_THREADS", "CREATE_PRIVATE_THREADS", "SEND_MESSAGES_IN_THREADS"] }
+"Holder" = { allow = ["VIEW_CHANNEL"] }
+"Whale" = { allow = ["VIEW_CHANNEL"] }
+"Team" = { allow = ["VIEW_CHANNEL", "SEND_MESSAGES", "MANAGE_MESSAGES", "MENTION_EVERYONE"] }
+"bot" = { allow = ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "READ_MESSAGE_HISTORY"] }
+
+[[channels]]
+name = "lounge"
+role = "landing"         # where a fresh holder is sent after verifying
+category = "holders"
+topic = "Holders only. Nobody from the Team will ever DM you first."
+slowmode = 5
+
+[[channels]]
+name = "support"
+category = "holders"
+topic = "Questions for the Team. We answer here, never in DMs."
+slowmode = 10
+
+[[categories]]
+name = "voice"
+[categories.overwrites]
+"@everyone" = { deny = ["VIEW_CHANNEL", "CONNECT"] }
+"Holder" = { allow = ["VIEW_CHANNEL", "CONNECT"] }
+"Whale" = { allow = ["VIEW_CHANNEL", "CONNECT"] }
+"Team" = { allow = ["VIEW_CHANNEL", "CONNECT", "MUTE_MEMBERS", "MOVE_MEMBERS"] }
+"bot" = { allow = ["VIEW_CHANNEL"] }
+
+[[channels]]
+name = "Lounge"
+type = "voice"
+category = "voice"
+
+[[categories]]
+name = "team"
+[categories.overwrites]
+"@everyone" = { deny = ["VIEW_CHANNEL"] }
+"Team" = { allow = ["VIEW_CHANNEL", "SEND_MESSAGES", "MANAGE_MESSAGES", "READ_MESSAGE_HISTORY"] }
+"bot" = { allow = ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "READ_MESSAGE_HISTORY"] }
+
+[[channels]]
+name = "audit-log"
+category = "team"
+role = "audit"
+topic = "Every verification, revoke, sweep and AutoMod hit lands here."
+[channels.overwrites]
+"@everyone" = { deny = ["VIEW_CHANNEL"] }
+"Team" = { allow = ["VIEW_CHANNEL", "READ_MESSAGE_HISTORY"], deny = ["SEND_MESSAGES"] }
+"bot" = { allow = ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS", "READ_MESSAGE_HISTORY"] }
+
+[[channels]]
+name = "bot-commands"
+category = "team"
+topic = "Team-only: /gate sweep · /gate revoke · /gate lookup · /gate stats"
+
+# ---------------------------------------------------------------- AutoMod
+[automod]
+alert_channel = "audit-log"
+exempt_roles = ["Team", "bot"]
+exempt_channels = ["bot-commands", "audit-log"]
+# Links: everything blocked except these (wildcards allowed at the ends). Put YOUR domains here.
+link_allowlist = ["*example.xyz*", "*discord.com/channels/*", "*opensea.io*", "*etherscan.io*"]
+# Phrases that only ever appear in scams. Extend privately — a public list is easy to phrase around.
+scam_keywords = ["seed phrase", "recovery phrase", "*wallet sync*", "validate your wallet", "*free mint*", "dm me"]
+mention_limit = 5
+timeout_seconds = 600
+# Impersonation (member-profile) rules CANNOT be created by bots; the owner adds one in Server Settings → AutoMod.
+
+# ---------------------------------------------------------------- pinned messages (bot-owned; edited in place on re-run)
+[messages.rules]
+channel = "rules"
+title = "House rules"
+body = """
+**1.** Holders only. Verify in #verify to unlock the server.
+**2.** Close your DMs for this server (server icon → Privacy Settings → Direct Messages OFF). Verification checks it. Nobody on the Team will ever DM you — anyone who does is a scammer.
+**3.** The only verification link is the one pinned in #verify. Never sign anything anywhere else.
+**4.** Verification is re-checked automatically. Sell and the roles go away on their own.
+"""
+
+[messages.verify]
+channel = "verify"
+title = "How to verify"
+body = """
+**1.** Close your DMs for this server: server icon → **Privacy Settings** → **Direct Messages OFF**. Verification will not pass while they are open.
+**2.** Type `/verify` in this channel. The bot answers only you.
+**3.** Open the link it gives you — it will always be **{verify_url}** and nothing else.
+**4.** Log in with Discord, connect the wallet that holds your NFT, and sign the message. Signing is free and moves nothing.
+**5.** Your roles appear within seconds and you are sent back to Discord.
+
+⚠️ **The only DM this bot will ever send is a warning that your DMs are open.** It never sends links. Anything else is a scam.
+"""

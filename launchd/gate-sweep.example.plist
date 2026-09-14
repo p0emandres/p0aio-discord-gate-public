@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- macOS: fire the re-check every 6 h (Vercel Hobby only allows a daily cron). Replace /path/to and load with:
+     cp launchd/gate-sweep.example.plist ~/Library/LaunchAgents/gate-sweep.plist && launchctl load -w ~/Library/LaunchAgents/gate-sweep.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>gate-sweep</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/zsh</string><string>/path/to/discord-nft-gate/sweep_trigger.sh</string></array>
+  <key>StartInterval</key><integer>21600</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/path/to/discord-nft-gate/logs/sweep.log</string>
+  <key>StandardErrorPath</key><string>/path/to/discord-nft-gate/logs/sweep.log</string>
+</dict>
+</plist>

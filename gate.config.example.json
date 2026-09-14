@@ -1,0 +1,10 @@
+{
+  "_comment": "Written by intake.py — you normally never edit this by hand. Shown here so you know what it holds. No secrets.",
+  "project": "my-collection",
+  "chain": "ethereum",
+  "network": "mainnet",
+  "collection": { "address": "0x0000000000000000000000000000000000000000", "name": "My Collection", "symbol": "MYC", "supply": 1000, "standard": "ERC-721" },
+  "discord": { "app_id": "…", "public_key": "…", "guild_id": "…", "guild_name": "My Server", "oauth_client_secret_set": true },
+  "hosting": { "provider": "vercel", "verify_domain": "verify.example.xyz", "database_url_set": true },
+  "policy": { "sweep_hours": 6, "prune_days": 7, "tiers": [{ "role": "Holder", "min": 1 }], "one_seat_per_nft": true }
+}

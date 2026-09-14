@@ -27,7 +27,7 @@ const dmWarning = () =>
 
 /** true = DMs closed (or check disabled/unavailable). Throws DmsOpenError when a probe DM was delivered. */
 async function assertDmsClosed(uid: string, wallet: string | null, context: string) {
-  if (!env.requireDmsClosed) return;
+  if (!env.requireDmsClosed || env.dryRoles) return;
   const status = await discord.dmStatus(uid, dmWarning());
   if (status === "open") {
     await auditRow("blocked_dms_open", uid, wallet, { context });
@@ -53,6 +53,7 @@ export async function applyRoles(uid: string, want: string[], reason: string) {
   const cur = new Set(member.roles);
   const add = want.filter((r) => !cur.has(r));
   const remove = [...cur].filter((r) => managed.has(r) && !want.includes(r));
+  if (env.dryRoles) { console.warn("GATE_DRY_ROLES: not touching Discord", { uid, add, remove }); return { add, remove, member }; }
   for (const r of add) await discord.addRole(uid, r, reason);
   for (const r of remove) await discord.removeRole(uid, r, reason);
   return { add, remove, member };

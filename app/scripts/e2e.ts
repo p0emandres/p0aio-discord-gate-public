@@ -1,4 +1,7 @@
-// End-to-end exercise of the verify service against a LOCAL server + throwaway DB. Read-only against Discord.
+// End-to-end exercise of the verify service against a LOCAL server + throwaway DB.
+// The server MUST be started with GATE_DRY_ROLES=1 (no role changes, posts, kicks or DM probes reach Discord);
+// this script refuses to run otherwise, because it signs in as a REAL member of the live server.
+//   GATE_DRY_ROLES=1 DATABASE_URL=postgres://… npx next start -p 3999
 //   BASE=http://localhost:3999 KEYFILE=/path/test-ed25519.json npx tsx scripts/e2e.ts
 import { readFileSync } from "node:fs";
 import { sign as edSign } from "node:crypto";
@@ -23,6 +26,8 @@ async function interaction(payload: object, signed = true) {
 const member = (uid: string, roles: string[] = [], perms = "0") => ({ user: { id: uid, username: "tester" }, roles, permissions: perms });
 
 async function main() {
+  const probe = await fetch(`${BASE}/api/me`).then((r) => r.json()) as { dry?: boolean };
+  if (probe.dry !== true) { console.error("REFUSING: the server at", BASE, "is not in GATE_DRY_ROLES=1 mode. This test signs in as a real member and would change live Discord roles."); process.exit(2); }
   // Who to impersonate for the session: the guild owner (a real member; we only ever READ their membership).
   const g = await fetch(`https://discord.com/api/v10/guilds/${env.guildId}`, { headers: { Authorization: `Bot ${env.botToken}` } }).then((r) => r.json()) as { owner_id: string };
   const uid = process.env.TEST_UID || g.owner_id;

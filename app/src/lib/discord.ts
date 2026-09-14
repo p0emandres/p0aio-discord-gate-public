@@ -41,6 +41,7 @@ export const discord = {
     if (r.status !== 204) throw new Error(`removeRole ${roleId} → HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
   },
   async kick(uid: string, reason: string) {
+    if (env.dryRoles) { console.warn("GATE_DRY_ROLES: not kicking", uid); return false; }
     const r = await rest("DELETE", `/guilds/${env.guildId}/members/${uid}`, undefined, reason);
     return r.status === 204;
   },
@@ -58,6 +59,7 @@ export const discord = {
     return out;
   },
   async send(channelId: string, payload: unknown) {
+    if (env.dryRoles) { console.warn("GATE_DRY_ROLES: not posting", channelId); return { status: 200, data: {} }; }
     return rest("POST", `/channels/${channelId}/messages`, payload);
   },
   async editOriginal(interactionToken: string, payload: unknown) {
@@ -68,6 +70,7 @@ export const discord = {
    * (code 50007), which is what we want. "open" = the message was delivered, so a scammer could reach them too.
    */
   async dmStatus(uid: string, content: string): Promise<"open" | "closed" | "unknown"> {
+    if (env.dryRoles) return "closed";
     const ch = await rest<{ id?: string; code?: number }>("POST", "/users/@me/channels", { recipient_id: uid });
     if (ch.status !== 200 || !ch.data.id) return "unknown";
     const msg = await rest<{ code?: number }>("POST", `/channels/${ch.data.id}/messages`, { content });
@@ -77,7 +80,7 @@ export const discord = {
   },
   /** Best-effort line in #audit-log. Never throws. */
   async audit(kind: string, fields: Record<string, string | number | undefined>, color = 0x5be0c8) {
-    if (!env.auditChannelId) return;
+    if (!env.auditChannelId || env.dryRoles) return;
     const embed = {
       title: kind,
       color,

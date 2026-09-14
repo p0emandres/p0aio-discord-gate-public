@@ -13,6 +13,7 @@ export async function GET(req: Request) {
   const s = sessionFrom(req);
   const base = {
     project: env.projectName, domain: env.verifyDomain, chainId: env.chainId, guildId: env.guildId, landingChannelId: env.landingChannelId || null,
+    dry: env.dryRoles,
     tiers: env.tiers.map((t) => ({ role: t.role, min: t.min })),
   };
   if (!s) return NextResponse.json({ ...base, user: null, binding: null });

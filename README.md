@@ -61,8 +61,12 @@ docs/OPERATIONS.md     day-to-day runbook
 ```
 cd app
 DATABASE_URL=postgres://… npx tsx scripts/seat-test.ts               # one-seat-per-NFT rules against a mock chain
-BASE=http://localhost:3999 KEYFILE=… npx tsx scripts/e2e.ts          # full HTTP flow against a local `next start`
+GATE_DRY_ROLES=1 DATABASE_URL=postgres://… npx next start -p 3999    # test server: no Discord writes can happen
+BASE=http://localhost:3999 KEYFILE=… npx tsx scripts/e2e.ts          # refuses to run unless the server is in dry mode
 ```
+
+The e2e test signs in as a real member of your server, so the server it targets must be in `GATE_DRY_ROLES=1` mode
+(no role changes, posts, kicks or DM probes reach Discord). Never set that on production.
 
 ## Discord rules you will hit (all handled, all documented in the scripts' messages)
 

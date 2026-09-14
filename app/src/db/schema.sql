@@ -51,3 +51,9 @@ create table if not exists ratelimit (
   count         integer not null,
   primary key (bucket, key)
 );
+
+-- Spent proof-of-work challenges (single use). Rows expire on the next sweep.
+create table if not exists pow_spent (
+  salt        text primary key,
+  expires_at  timestamptz not null
+);

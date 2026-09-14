@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { solve } from "@/lib/sha256";
 
 type Me = {
   project: string; domain: string; chainId: number; guildId: string; landingChannelId: string | null; tiers: { role: string; min: number }[];
@@ -10,6 +11,16 @@ type Eip1193 = { request: (a: { method: string; params?: unknown[] }) => Promise
 type WalletOpt = { uuid: string; name: string; icon?: string; provider: Eip1193 };
 type Result = { ok: true; wallet: string; tokens: string[]; roles: number; added: number; removed: number; inGuild: boolean };
 
+async function proveWork(scope: "login" | "nonce", onStatus: (s: string) => void) {
+  onStatus("checking your browser…");
+  const r = await fetch("/api/pow", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope }) });
+  const j = (await r.json()) as { challenge?: string; bits?: number; error?: string };
+  if (!r.ok || !j.challenge || !j.bits) throw new Error(j.error || "browser check unavailable");
+  const counter = await solve(j.challenge, j.bits);
+  onStatus("");
+  return { challenge: j.challenge, counter };
+}
+
 const toHex = (s: string) => "0x" + Array.from(new TextEncoder().encode(s)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export default function VerifyApp() {
@@ -18,6 +29,7 @@ export default function VerifyApp() {
   const [picked, setPicked] = useState<WalletOpt | null>(null);
   const [address, setAddress] = useState<string>("");
   const [busy, setBusy] = useState<string>("");
+  const [note, setNote] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [steps, setSteps] = useState<string[]>([]);
   const [result, setResult] = useState<Result | null>(null);
@@ -61,6 +73,14 @@ export default function VerifyApp() {
   const path = me?.guildId ? `channels/${me.guildId}${me.landingChannelId ? `/${me.landingChannelId}` : ""}` : "";
   const appUrl = path ? `discord://-/${path}` : "discord://-/";
   const webUrl = path ? `https://discord.com/${path}` : "https://discord.com/app";
+  const login = async () => {
+    setError(""); setBusy("login");
+    try {
+      const pow = await proveWork("login", setNote);
+      window.location.href = `/api/auth/discord?c=${encodeURIComponent(pow.challenge)}&n=${pow.counter}`;
+    } catch (e) { setError((e as Error).message || "could not start login"); setBusy(""); }
+  };
+
   const connect = async (w: WalletOpt) => {
     setError(""); setBusy("connect");
     try {
@@ -75,7 +95,8 @@ export default function VerifyApp() {
     if (!picked || !address) return;
     setError(""); setBusy("verify"); setResult(null);
     try {
-      const n = await fetch("/api/verify/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address }) });
+      const pow = await proveWork("nonce", setNote);
+      const n = await fetch("/api/verify/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address, pow }) });
       const nj = (await n.json()) as { message?: string; error?: string };
       if (!n.ok || !nj.message) throw new Error(nj.error || "could not start");
       const signature = (await picked.provider.request({ method: "personal_sign", params: [toHex(nj.message), address] })) as string;
@@ -117,7 +138,7 @@ export default function VerifyApp() {
           <h2>Log in with Discord</h2>
           <div className="body">
             {me?.user ? <>Logged in as <span className="mono">{me.user.name}</span> · <button className="link" onClick={logout}>log out</button></>
-              : <div className="row"><a href="/api/auth/discord"><button className="primary">Log in with Discord</button></a></div>}
+              : <div className="row"><button className="primary" disabled={busy !== ""} onClick={login}>{busy === "login" ? (note || "Opening Discord…") : "Log in with Discord"}</button></div>}
 
           </div>
         </div>
@@ -154,7 +175,7 @@ export default function VerifyApp() {
                 {!step2 && <p style={{ marginTop: 10 }}>Changed wallets? Connect the new one above and sign again.</p>}
               </div>
             )}
-            {step2 && !result && <div className="row"><button className="primary" disabled={busy !== ""} onClick={verify}>{busy === "verify" ? "Waiting for your wallet…" : "Sign & verify"}</button></div>}
+            {step2 && !result && <div className="row"><button className="primary" disabled={busy !== ""} onClick={verify}>{busy === "verify" ? (note || "Waiting for your wallet…") : "Sign & verify"}</button></div>}
             {result && (
               <div>
                 {result.tokens.length

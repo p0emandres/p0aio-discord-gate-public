@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const err = (m: string, status = 400) => NextResponse.json({ error: m }, { status });
 
 export async function POST(req: Request) {
-  const block = (await limited(req, "verify_ip", 10, 600)) ?? (await limited(req, "verify_global", 120, 60, "global"));
+  const block = (await limited(req, "verify_ip", 30, 600)) ?? (await limited(req, "verify_global", 120, 60, "global"));
   if (block) return block;
   if (!sameOrigin(req)) return err("bad origin", 403);
   const s = sessionFrom(req);

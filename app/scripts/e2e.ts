@@ -4,7 +4,7 @@
 //   GATE_DRY_ROLES=1 DATABASE_URL=postgres://… npx next start -p 3999
 //   BASE=http://localhost:3999 KEYFILE=/path/test-ed25519.json npx tsx scripts/e2e.ts
 import { readFileSync } from "node:fs";
-import { sign as edSign } from "node:crypto";
+import { createHash, sign as edSign } from "node:crypto";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { loadLocalEnv } from "./_env";
 import { env } from "../src/lib/env";
@@ -16,6 +16,14 @@ const key = JSON.parse(readFileSync(process.env.KEYFILE!, "utf8")) as { pub: str
 let pass = 0, fail = 0;
 const check = (name: string, ok: boolean, detail = "") => { ok ? pass++ : fail++; console.log(`${ok ? "✔" : "✘"} ${name}${detail ? " — " + detail : ""}`); };
 const j = async (r: Response) => ({ status: r.status, body: await r.json().catch(() => ({})) as Record<string, unknown> });
+
+// Proof-of-work solver (same rule as the browser): sha256(`${challenge}:${counter}`) must start with `bits` zero bits.
+function lz(buf: Buffer) { let n = 0; for (const b of buf) { if (b === 0) { n += 8; continue; } n += Math.clz32(b) - 24; break; } return n; }
+async function pow(scope: "login" | "nonce", origin = env.origin) {
+  const r = await fetch(`${BASE}/api/pow`, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify({ scope }) });
+  const j = (await r.json()) as { challenge: string; bits: number };
+  for (let n = 0; ; n++) if (lz(createHash("sha256").update(`${j.challenge}:${n}`).digest()) >= j.bits) return { challenge: j.challenge, counter: n, bits: j.bits };
+}
 
 async function interaction(payload: object, signed = true) {
   const body = JSON.stringify(payload), ts = String(Math.floor(Date.now() / 1000));
@@ -57,9 +65,30 @@ async function main() {
   r = await j(await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: "nope" }) }));
   check("nonce with bad address → 400", r.status === 400);
 
+  // --- proof-of-work gate
+  const acct0 = privateKeyToAccount(generatePrivateKey());
+  r = await j(await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct0.address }) }));
+  check("challenge request without proof-of-work → 403", r.status === 403 && String(r.body.error).includes("browser check"), String(r.body.error));
+  const solved = await pow("nonce");
+  check(`proof-of-work solved in Node (bits=${solved.bits})`, solved.counter >= 0);
+  r = await j(await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct0.address, pow: { challenge: solved.challenge, counter: solved.counter + 1 } }) }));
+  check("wrong counter → rejected", r.status === 403 && String(r.body.error).includes("failed"), String(r.body.error));
+  r = await j(await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct0.address, pow: solved }) }));
+  check("correct solution → challenge issued", r.status === 200 && !!r.body.message);
+  r = await j(await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct0.address, pow: solved }) }));
+  check("same solution replayed → rejected", r.status === 403 && String(r.body.error).includes("already used"), String(r.body.error));
+  const wrongScope = await pow("login");
+  r = await j(await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct0.address, pow: wrongScope }) }));
+  check("login-scope solution used for a nonce → rejected", r.status === 403, String(r.body.error));
+  const rs = await fetch(`${BASE}/api/auth/discord`, { redirect: "manual" });
+  check("login start without proof-of-work → bounced back with an error", rs.status >= 300 && rs.status < 400 && (rs.headers.get("location") || "").includes("error="), rs.headers.get("location") || "");
+  const lp = await pow("login");
+  const rs2 = await fetch(`${BASE}/api/auth/discord?c=${encodeURIComponent(lp.challenge)}&n=${lp.counter}`, { redirect: "manual" });
+  check("login start with proof-of-work → redirected to Discord", (rs2.headers.get("location") || "").startsWith("https://discord.com/oauth2/authorize"), rs2.headers.get("location")?.slice(0, 50) || "");
+
   // --- happy path with a fresh (empty) wallet
   const acct = privateKeyToAccount(generatePrivateKey());
-  const nonce = async () => (await j(await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct.address }) }))).body.message as string | undefined;
+  const nonce = async () => (await j(await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct.address, pow: await pow("nonce") }) }))).body.message as string | undefined;
   const msg = await nonce();
   check("nonce issued with our domain + statement", !!msg && msg.includes(env.verifyDomain) && msg.includes(uid), msg?.split("\n")[0]);
   let sig = await acct.signMessage({ message: msg! });
@@ -82,7 +111,7 @@ async function main() {
 
   // --- rate limit (5 per 10 min per user)
   let limited = false;
-  for (let i = 0; i < 4; i++) { const rr = await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct.address }) }); if (rr.status === 429) { limited = true; break; } }
+  for (let i = 0; i < 4; i++) { const rr = await fetch(`${BASE}/api/verify/nonce`, { method: "POST", headers: H, body: JSON.stringify({ address: acct.address, pow: await pow("nonce") }) }); if (rr.status === 429) { limited = true; break; } }
   check("nonce rate limit kicks in", limited);
 
   // --- me / sweep / unlink

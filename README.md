@@ -25,6 +25,7 @@ wallets and manages roles, a scheduled re-check that revokes on sale, and an aud
 | a leaked bot token | the bot runs with seven permissions (no Administrator, no Manage Server); build-time extras are dropped after provisioning |
 | the browser lying | nothing from the client is trusted: identity comes from Discord OAuth, the wallet from the signature, holdings from the chain |
 | floods / scripted abuse | shared rate limits in Postgres: per IP on login start/callback/challenge/verify/status, per user on challenges and slash commands, a global ceiling on chain-touching calls; optional minimum Discord account age for `/verify` |
+| scripted floods that get past rate limits | a homemade "checking your browser" step: a server-signed sha256 proof-of-work puzzle before every login start and signing challenge; scoped, 90-second, single-use; difficulty escalates with global demand (16 → 22 bits) and falls back afterwards; no third party, no images, screen-reader neutral |
 | CSRF / session theft | same-origin checks on every state change, HMAC-signed 15-minute session cookie, `httpOnly`/`secure`/`sameSite`, strict CSP + HSTS |
 
 Secrets live in `.env` (mode 600) and your host's env store. Nothing sensitive is in any file this repo asks you to commit.

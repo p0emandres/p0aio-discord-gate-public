@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { verifyPow } from "@/lib/pow";
 import { limited } from "@/lib/ratelimit";
 import { randomToken, setCookie, sign, STATE_COOKIE, STATE_TTL } from "@/lib/session";
 
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const block = await limited(req, "oauth_start", 20, 600);
   if (block) return block;
+  const q = new URL(req.url).searchParams;
+  const why = await verifyPow(q.get("c") || undefined, q.get("n") || undefined, "login");
+  if (why) return NextResponse.redirect(`${env.origin}/?error=${encodeURIComponent(why)}`);
   const state = randomToken(16);
   const u = new URL("https://discord.com/oauth2/authorize");
   u.searchParams.set("client_id", env.appId);

@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { limited } from "@/lib/ratelimit";
 import { randomToken, setCookie, sign, STATE_COOKIE, STATE_TTL } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const block = await limited(req, "oauth_start", 20, 600);
+  if (block) return block;
   const state = randomToken(16);
   const u = new URL("https://discord.com/oauth2/authorize");
   u.searchParams.set("client_id", env.appId);

@@ -42,3 +42,12 @@ create index if not exists audit_at on audit(at desc);
 
 -- Added 2026-09-14: when we last warned a member that their server DMs are open (sweep throttles to once a day).
 alter table bindings add column if not exists dm_warned_at timestamptz;
+
+-- Shared fixed-window rate limits (per IP, per user, global). Rows expire on the next sweep.
+create table if not exists ratelimit (
+  bucket        text not null,
+  key           text not null,
+  window_start  timestamptz not null,
+  count         integer not null,
+  primary key (bucket, key)
+);

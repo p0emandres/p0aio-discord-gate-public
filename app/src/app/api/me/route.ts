@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { maskWallet } from "@/lib/discord";
 import { env } from "@/lib/env";
+import { limited } from "@/lib/ratelimit";
 import { sessionFrom } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  const block = await limited(req, "me_ip", 60, 60);
+  if (block) return block;
   const s = sessionFrom(req);
   const base = {
     project: env.projectName, domain: env.verifyDomain, chainId: env.chainId, guildId: env.guildId, landingChannelId: env.landingChannelId || null,

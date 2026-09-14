@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { limited } from "@/lib/ratelimit";
 import { clearCookie, readCookie, SESSION_COOKIE, SESSION_TTL, setCookie, sign, STATE_COOKIE, verify } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,8 @@ export const dynamic = "force-dynamic";
 const fail = (why: string) => NextResponse.redirect(`${env.origin}/?error=${encodeURIComponent(why)}`);
 
 export async function GET(req: Request) {
+  const block = await limited(req, "oauth_cb", 10, 600);
+  if (block) return block;
   const u = new URL(req.url);
   const code = u.searchParams.get("code");
   const state = u.searchParams.get("state");

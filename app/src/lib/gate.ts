@@ -200,6 +200,8 @@ export async function sweep(): Promise<SweepSummary> {
     }
   }
 
+  await sql`delete from ratelimit where window_start < now() - interval '1 hour'`;
+  await sql`delete from nonces where created_at < now() - interval '1 day'`;
   s.ms = Date.now() - t0;
   await auditRow("sweep", null, null, s as never);
   await discord.audit("🧹 sweep", {

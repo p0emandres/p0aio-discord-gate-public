@@ -45,4 +45,6 @@ export const env = {
   get projectName() { return opt("PROJECT_NAME", "NFT"); },
   /** Verification requires "Allow direct messages from server members" to be OFF for this server. */
   get requireDmsClosed() { return opt("REQUIRE_DMS_CLOSED", "true") !== "false"; },
+  /** /verify refuses Discord accounts younger than this many days (0 = off). Throwaway raid accounts are hours old. */
+  get minAccountAgeDays() { return Number(opt("MIN_ACCOUNT_AGE_DAYS", "0")); },
 };

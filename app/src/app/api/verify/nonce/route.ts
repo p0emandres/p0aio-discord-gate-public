@@ -4,12 +4,15 @@ import { isAddress, getAddress } from "viem";
 import { buildSiwe, NONCE_TTL_MS } from "@/lib/chain";
 import { sql } from "@/lib/db";
 import { discord } from "@/lib/discord";
+import { limited } from "@/lib/ratelimit";
 import { randomToken, sameOrigin, sessionFrom } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 const err = (m: string, status = 400) => NextResponse.json({ error: m }, { status });
 
 export async function POST(req: Request) {
+  const block = (await limited(req, "nonce_ip", 10, 600)) ?? (await limited(req, "nonce_global", 120, 60, "global"));
+  if (block) return block;
   if (!sameOrigin(req)) return err("bad origin", 403);
   const s = sessionFrom(req);
   if (!s) return err("not logged in", 401);

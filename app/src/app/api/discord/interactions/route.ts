@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { discord, maskWallet, verifyInteraction } from "@/lib/discord";
 import { env } from "@/lib/env";
 import { lookup, sweep, stats, unlink, type SweepSummary } from "@/lib/gate";
+import { hit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,15 +37,23 @@ export async function POST(req: Request) {
 
   const uid = i.member.user.id;
   const who = i.member.user.username;
+  const rl = await hit("cmd_user", uid, 10, 60);
+  if (!rl.ok) return reply(`Slow down — try again in ${rl.retryAfter}s.`);
   const isTeam = (env.teamRoleId && i.member.roles.includes(env.teamRoleId)) || (BigInt(i.member.permissions || "0") & (1n << 5n)) !== 0n;
 
   try {
     switch (i.data.name) {
-      case "verify":
+      case "verify": {
+        if (env.minAccountAgeDays > 0) {
+          const createdMs = Number((BigInt(uid) >> 22n) + 1420070400000n);
+          const ageDays = (Date.now() - createdMs) / 86_400_000;
+          if (ageDays < env.minAccountAgeDays) return reply(`This Discord account is ${Math.floor(ageDays)} day(s) old. Accounts must be at least ${env.minAccountAgeDays} day(s) old to verify — come back later.`);
+        }
         return reply(
           `**Verify at ${env.origin}** — that is the only link, ever.\nLog in with Discord, connect the wallet holding your ${env.projectName}, sign the free message. Roles land in seconds.\n\n🔒 **First, close your DMs for this server:** right-click the server icon → Privacy Settings → Direct Messages OFF. Verification checks it.\n⚠️ The only DM this bot ever sends is a warning that your DMs are open. It never sends links. Anyone else DMing you is a scammer.`,
           { components: [{ type: 1, components: [{ type: 2, style: 5, label: `Open ${env.verifyDomain}`, url: env.origin }] }] },
         );
+      }
       case "status": {
         const [b] = await sql<{ wallet: string; token_count: number; verified_at: string; last_checked_at: string | null }[]>`
           select wallet, token_count, verified_at, last_checked_at from bindings where discord_user_id = ${uid}`;

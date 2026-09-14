@@ -92,6 +92,14 @@ async function main() {
   r = await j(await fetch(`${BASE}/api/me`, { headers: { Cookie: cookie } }));
   check("/api/me binding gone", r.body.binding === null);
 
+  // --- abuse limits
+  let last = 0, retry = "";
+  for (let i = 0; i < 21; i++) { const rr = await fetch(`${BASE}/api/auth/discord`, { redirect: "manual" }); last = rr.status; retry = rr.headers.get("retry-after") || ""; }
+  check("21st login-start from one IP → 429 with Retry-After", last === 429 && retry !== "", `status ${last} retry-after ${retry}`);
+  let cmdLast = "";
+  for (let i = 0; i < 11; i++) { const rr = await interaction({ type: 2, token: "t", guild_id: env.guildId, member: member("777"), data: { name: "status" } }); cmdLast = (rr.body.data as { content: string })?.content || ""; }
+  check("11th slash command from one user in a minute → slowed down", cmdLast.startsWith("Slow down"), cmdLast);
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }

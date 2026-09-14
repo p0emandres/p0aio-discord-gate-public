@@ -24,6 +24,7 @@ wallets and manages roles, a scheduled re-check that revokes on sale, and an aud
 | forged bot traffic | every Discord interaction is Ed25519-verified; commands from other servers are refused; team commands need the Team role or Manage Server |
 | a leaked bot token | the bot runs with seven permissions (no Administrator, no Manage Server); build-time extras are dropped after provisioning |
 | the browser lying | nothing from the client is trusted: identity comes from Discord OAuth, the wallet from the signature, holdings from the chain |
+| floods / scripted abuse | shared rate limits in Postgres: per IP on login start/callback/challenge/verify/status, per user on challenges and slash commands, a global ceiling on chain-touching calls; optional minimum Discord account age for `/verify` |
 | CSRF / session theft | same-origin checks on every state change, HMAC-signed 15-minute session cookie, `httpOnly`/`secure`/`sameSite`, strict CSP + HSTS |
 
 Secrets live in `.env` (mode 600) and your host's env store. Nothing sensitive is in any file this repo asks you to commit.

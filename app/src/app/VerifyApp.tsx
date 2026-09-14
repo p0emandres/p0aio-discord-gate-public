@@ -37,16 +37,7 @@ export default function VerifyApp() {
 
   const load = useCallback(async () => {
     const r = await fetch("/api/me", { cache: "no-store" });
-    const m = (await r.json()) as Me;
-    setMe(m);
-    // Restore the last success for this user if the page was reloaded (phones do this when you switch apps).
-    try {
-      const saved = sessionStorage.getItem("gate_last_result");
-      if (saved && m.user && m.binding) {
-        const { uid, result } = JSON.parse(saved) as { uid: string; result: Result };
-        if (uid === m.user.id) setResult((cur) => cur ?? result);
-      } else if (!m.binding) sessionStorage.removeItem("gate_last_result");
-    } catch { /* storage unavailable */ }
+    setMe((await r.json()) as Me);
   }, []);
 
   useEffect(() => {
@@ -104,27 +95,26 @@ export default function VerifyApp() {
       const vj = (await v.json()) as Result & { error?: string; code?: string; steps?: string[] };
       if (!v.ok) { setSteps(vj.code === "dms_open" ? vj.steps ?? [] : []); throw new Error(vj.error || "verification failed"); }
       setSteps([]); setResult(vj);
-      try { sessionStorage.setItem("gate_last_result", JSON.stringify({ uid: me?.user?.id, result: vj })); } catch { /* ignore */ }
       await load();
       if (vj.tokens.length && vj.inGuild) setTimeout(() => { window.location.href = appUrl; }, 700);
     } catch (e) { setError((e as Error).message || "failed"); }
     finally { setBusy(""); }
   };
 
-  const unlink = async () => {
-    setBusy("unlink"); setError("");
-    try { await fetch("/api/verify/unlink", { method: "POST" }); setResult(null); try { sessionStorage.removeItem("gate_last_result"); } catch { /* ignore */ } await load(); }
-    finally { setBusy(""); }
-  };
-  const logout = async () => { await fetch("/api/auth/logout", { method: "POST" }); setPicked(null); setAddress(""); setResult(null); try { sessionStorage.removeItem("gate_last_result"); } catch { /* ignore */ } await load(); };
+  const logout = async () => { await fetch("/api/auth/logout", { method: "POST" }); setPicked(null); setAddress(""); setResult(null); await load(); };
 
   const expected = me?.domain;
   const domainOk = !expected || host === expected || host.startsWith("localhost");
-  const step1 = !!me?.user, step2 = step1 && !!address, step3 = !!result || !!me?.binding;
+  const step1 = !!me?.user, step2 = step1 && !!address, step3 = !!result;
 
   return (
     <>
-      <h1>{me?.project ?? "…"} · verify</h1>
+      <header className="brand">
+        <span className="eyebrow">▸ Holder Verification</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="wordmark" src="/NFT-wordmark.webp" alt={`${me?.project ?? "NFT"} logo`} />
+        <h1>verify</h1>
+      </header>
       <p className="sub">Prove you hold one. Signing is free and moves nothing.</p>
 
       <div className={`domain ${domainOk ? "" : "bad"}`}>
@@ -164,17 +154,7 @@ export default function VerifyApp() {
         <div style={{ flex: 1 }}>
           <h2>Sign the message</h2>
           <div className="body">
-            {!step2 && !result && !me?.binding ? "Your wallet will show a plain-text message. It is not a transaction." : null}
-            {!result && me?.binding && (
-              <div>
-                <p className="ok">✅ You&apos;re verified. Wallet {me.binding.wallet} holds {me.binding.tokens} {me.project}. Your roles are active.</p>
-                <div className="row">
-                  <a href={appUrl}><button className="primary">Open Discord app</button></a>
-                  <a href={webUrl} className="mono" style={{ fontSize: 12 }}>open in browser instead</a>
-                </div>
-                {!step2 && <p style={{ marginTop: 10 }}>Changed wallets? Connect the new one above and sign again.</p>}
-              </div>
-            )}
+            {!step2 && !result ? "Your wallet will show a plain-text message. It is not a transaction." : null}
             {step2 && !result && <div className="row"><button className="primary" disabled={busy !== ""} onClick={verify}>{busy === "verify" ? (note || "Waiting for your wallet…") : "Sign & verify"}</button></div>}
             {result && (
               <div>
@@ -188,7 +168,6 @@ export default function VerifyApp() {
             )}
             {error && <p className="bad">{error}</p>}
             {steps.length > 0 && <ol className="steps">{steps.map((st) => <li key={st}>{st}</li>)}</ol>}
-            {me?.binding && <div className="row"><button className="link" disabled={busy !== ""} onClick={unlink}>unlink this wallet</button></div>}
           </div>
         </div>
       </div>
